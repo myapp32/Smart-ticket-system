@@ -1,0 +1,51 @@
+version: "3.9"
+
+services:
+  frontend:
+    container_name: smartticket-frontend
+    build:
+      context: ./FRONTEND
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: http://44.200.18.120:5000
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+    networks:
+      - smartticket-network
+    restart: always
+
+  backend:
+    container_name: smartticket-backend
+    build:
+      context: ./BACKEND
+      dockerfile: Dockerfile
+    env_file:
+      - ./BACKEND/.env
+    ports:
+      - "5000:5000"
+    depends_on:
+      - mongo
+    networks:
+      - smartticket-network
+    restart: always
+
+  mongo:
+    image: mongo:6
+    container_name: smartticket-mongo
+    ports:
+      - "27017:27017"
+    volumes:
+      - backend_data:/data/db
+    networks:
+      - smartticket-network
+    restart: always
+
+networks:
+  smartticket-network:
+    driver: bridge
+
+volumes:
+  backend_data:
+

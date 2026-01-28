@@ -1,152 +1,81 @@
-import bcrypt from "bcrypt";
+import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import User from "../models/user.model.js";
-import { inngest } from "../inngest/client.js";
 
+/* ---------- SIGN UP ---------- */
 export const signUp = async (req, res) => {
-  const {name, email, password, skills = []} = req.body;
-
   try {
-     if (!name || !email || !password) {
-      return res.status(400).json({ message: "Name, email, and password are required" });
+    const { email, password, name } = req.body;
+
+    if (!email || !password) {
+      return res.status(400).json({ message: "Email and password required" });
     }
 
-    const existingUser = await User.findOne({ email: email.toLowerCase() });
+    const existingUser = await User.findOne({ email });
     if (existingUser) {
-      return res.status(400).json({ message: "User already exists" });
+      return res.status(409).json({ message: "User already exists" });
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
     const user = await User.create({
-      name,
-      email : email.toLowerCase(),
+      email,
       password: hashedPassword,
-      skills,
+      name,
     });
 
-    // Fire inngest event
-    await inngest.send({
-        name: "user/signup",
-        date:{
-            email: email.toLowerCase(),
-        }
-    })
-    // Generate JWT token
-    const token = jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET, { expiresIn: '1h' });
-
-    const userObj = user.toObject();
-    delete userObj.password;
-
-    res.status(201).json({ user: userObj, token });
-  } 
-  catch (error) {
-    console.error("Error signing up:", error);
-    res.status(500).json({ message: "Internal server error" });
+    res.status(201).json({ message: "User created", userId: user._id });
+  } catch (err) {
+    res.status(500).json({ message: "Signup failed" });
   }
 };
 
+/* ---------- LOGIN ---------- */
 export const login = async (req, res) => {
-  const { email, password } = req.body;
-
   try {
+    const { email, password } = req.body || {};
+
     if (!email || !password) {
-      return res.status(400).json({ message: "Email and password are required" });
+      return res.status(400).json({
+        success: false,
+        message: "Email and password are required",
+      });
     }
 
-    const existingUser = await User.findOne({ email: email.toLowerCase() });
-
-    if (!existingUser) {
-      return res.status(400).json({ message: "Invalid credentials" });
-    }
-
-    const isMatch = await bcrypt.compare(password, existingUser.password);
-
-    if (!isMatch) {
-      return res.status(400).json({ message: "Invalid credentials" });
-    }
-
-    const token = jwt.sign({ id: existingUser._id, role: existingUser.role }, process.env.JWT_SECRET, { expiresIn: '1h' });
-
-    const userObj = existingUser.toObject();
-    delete userObj.password;
-
-    res.status(200).json({ user: userObj, token });
-  } 
-  catch (error) {
-    console.error("Error logging in:", error);
-    res.status(500).json({ message: "Internal server error" });
-  }
-};
-
-export const logout = async (req, res) => {
-    try {
-        const token = req.headers.authorization.split(" ")[1];
-
-        if (!token) {
-            return res.status(401).json({error : "Unauthorized"});
-        }
-
-        jwt.verify(token, process.env.JWT_SECRET, (err, decoded) => {
-            if (err) {  
-                return res.status(401).json({error : "Unauthorized"});
-            }
-
-            res.status(200).json({ message: "Logged out successfully" });
-        })
- 
-  } 
-  catch (error) {
-    console.error("Error logging out:", error);
-    res.status(500).json({ message: "Internal server error" });
-  }
-};
-
-export const updateUser = async (req, res) => {
-  const { skills = [], role, email } = req.body;
-
-  try {
-    if (!email) {
-      return res.status(400).json({ message: "Email is required" });
-    }
-
-    if (!req.user || (req.user.role !== "admin" && req.user.email !== email.toLowerCase())) {
-      return res.status(403).json({ message: "Forbidden" });
-    }
-
-    const user = await User.findOne({ email: email.toLowerCase() });
+    const user = await User.findOne({ email });
     if (!user) {
-      return res.status(404).json({ message: "User not found" });
+      return res.status(404).json({ success: false, message: "User not found" });
     }
 
-    if (skills.length) user.skills = skills;
-    if (role && req.user.role === "admin") user.role = role;
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) {
+      return res
+        .status(401)
+        .json({ success: false, message: "Invalid credentials" });
+    }
 
-    await user.save();
+    const token = jwt.sign(
+      { userId: user._id },
+      process.env.JWT_SECRET,
+      { expiresIn: "1d" }
+    );
 
-    const userObj = user.toObject();
-    delete userObj.password;
-
-    res.status(200).json({ message: "User updated successfully", user: userObj });
-  } 
-  catch (error) {
-    console.error("Error updating user:", error);
-    res.status(500).json({ message: "Internal server error" });
+    res.status(200).json({
+      success: true,
+      token,
+      user: { id: user._id, email: user.email, name: user.name },
+    });
+  } catch (error) {
+    res.status(500).json({ message: "Login failed" });
   }
 };
 
-
-export const getUsers = async (req, res) => {
+/* ---------- UPDATE USER ---------- */
+export const updateUser = async (req, res) => {
   try {
-    if (!req.user || req.user.role !== "admin") {
-      return res.status(403).json({ message: "Forbidden" });
-    }
-
-    const users = await User.find().select("-password");
-    res.status(200).json(users);
-  } 
-  catch (error) {
-    console.error("Error fetching users:", error);
-    res.status(500).json({ message: "Internal server error" });
+    res.json({ message: "Update user working" });
+  } catch (err) {
+    res.status(500).json({ message: "Update failed" });
   }
 };
+

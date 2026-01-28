@@ -1,6 +1,13 @@
 import { Ticket, User } from '../types';
 
+/**
+ * IMPORTANT:
+ * This must come from Vite env and NOT be undefined.
+ * In Docker it should be: http://backend:5000
+ */
 const API_BASE_URL = import.meta.env.VITE_API_URL;
+
+/* ===================== TYPES ===================== */
 
 interface LoginData {
   email: string;
@@ -22,15 +29,29 @@ interface CreateTicketData {
   description: string;
 }
 
+/* ===================== TOKEN ===================== */
+
 const getAuthToken = (): string | null => {
-  return localStorage.getItem('authToken');
+  return localStorage.getItem('token');
 };
 
-const fetchWithAuth = async (url: string, options: RequestInit = {}): Promise<Response> => {
+/* ===================== FETCH WITH AUTH ===================== */
+
+const fetchWithAuth = async (
+  url: string,
+  options: RequestInit = {}
+): Promise<Response> => {
+  if (!API_BASE_URL) {
+    throw new Error(
+      'VITE_API_URL is not defined. Check FRONTEND/.env and rebuild the app.'
+    );
+  }
+
   const token = getAuthToken();
-  const headers = {
+
+  const headers: HeadersInit = {
     'Content-Type': 'application/json',
-    ...options.headers,
+    ...(options.headers || {}),
   };
 
   if (token) {
@@ -43,87 +64,121 @@ const fetchWithAuth = async (url: string, options: RequestInit = {}): Promise<Re
   });
 
   if (!response.ok) {
+    let errorMessage = `Request failed with status ${response.status}`;
+
+    try {
+      const errorData = await response.json();
+      errorMessage = errorData?.message || errorMessage;
+    } catch {}
+
+    // Handle auth failure
     if (response.status === 401) {
-      localStorage.removeItem('authToken');
+      localStorage.removeItem('token');
       window.location.hash = '/login';
     }
-    const errorData = await response.json().catch(() => ({ message: 'An unknown error occurred' }));
-    throw new Error(errorData.message || 'API request failed');
+
+    throw new Error(errorMessage);
   }
 
   return response;
 };
 
+/* ===================== API ===================== */
+
 export const api = {
-  login: async (credentials: LoginData): Promise<{ token: string; user: User }> => {
-    const response = await fetchWithAuth('/auth/login', {
+  /* ---------- AUTH ---------- */
+
+  login: async (
+    credentials: LoginData
+  ): Promise<{ token: string; user: User }> => {
+    const response = await fetchWithAuth('/api/auth/login', {
       method: 'POST',
       body: JSON.stringify(credentials),
     });
+
+    const data = await response.json();
+    localStorage.setItem('token', data.token);
+    return data;
+  },
+
+  signup: async (
+    userData: SignupData
+  ): Promise<{ token: string; user: User }> => {
+    const response = await fetchWithAuth('/api/auth/signup', {
+      method: 'POST',
+      body: JSON.stringify(userData),
+    });
+
+    const data = await response.json();
+    localStorage.setItem('token', data.token);
+    return data;
+  },
+
+  getProfile: async (): Promise<User> => {
+    const response = await fetchWithAuth('/api/auth/profile');
     return response.json();
   },
 
-  signup: async (userData: SignupData): Promise<{ token: string; user: User }> => {
-    const response = await fetchWithAuth('/auth/signup', {
+  getAllUsers: async (): Promise<User[]> => {
+    const response = await fetchWithAuth('/api/auth/users');
+    return response.json();
+  },
+
+  updateUser: async (data: UpdateUserData): Promise<User> => {
+    const response = await fetchWithAuth('/api/auth/update-user', {
       method: 'POST',
-      body: JSON.stringify(userData),
+      body: JSON.stringify(data),
     });
     return response.json();
   },
 
-  getProfile: async (): Promise<User> => {
-    const response = await fetchWithAuth('/auth/profile');
-    return response.json();
-  },
+  /* ---------- TICKETS ---------- */
 
   getTickets: async (): Promise<Ticket[]> => {
-    const response = await fetchWithAuth('/tickets');
+    const response = await fetchWithAuth('/api/tickets');
     return response.json();
   },
 
   getTicketById: async (id: string): Promise<Ticket> => {
-    const response = await fetchWithAuth(`/tickets/${id}`);
+    const response = await fetchWithAuth(`/api/tickets/${id}`);
     const data = await response.json();
     return data.ticket;
   },
 
   createTicket: async (data: CreateTicketData): Promise<Ticket> => {
-    const response = await fetchWithAuth('/tickets', {
+    const response = await fetchWithAuth('/api/tickets', {
       method: 'POST',
       body: JSON.stringify(data),
     });
+
     const resData = await response.json();
     return resData.ticket;
   },
 
-  getAllUsers: async (): Promise<User[]> => {
-    const response = await fetchWithAuth('/auth/users');
-    return response.json();
-  },
-
-  updateUser: async (data: UpdateUserData): Promise<User> => {
-    const response = await fetchWithAuth('/auth/update-user', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
-    return response.json();
-  },
-
-  updateTicket: async (id: string, data: { title: string; description: string }): Promise<Ticket> => {
-    const response = await fetchWithAuth(`/tickets/${id}`, {
+  updateTicket: async (
+    id: string,
+    data: { title: string; description: string }
+  ): Promise<Ticket> => {
+    const response = await fetchWithAuth(`/api/tickets/${id}`, {
       method: 'PUT',
       body: JSON.stringify(data),
     });
+
     const resData = await response.json();
     return resData.ticket;
   },
 
-  updateTicketStatus: async (id: string, data: { status: string }): Promise<Ticket> => {
-    const response = await fetchWithAuth(`/tickets/${id}/status`, {
+  updateTicketStatus: async (
+    id: string,
+    data: { status: string }
+  ): Promise<Ticket> => {
+    const response = await fetchWithAuth(`/api/tickets/${id}/status`, {
       method: 'PUT',
       body: JSON.stringify(data),
     });
+
     const resData = await response.json();
     return resData.ticket;
   },
 };
+
