@@ -1,0 +1,59 @@
+@Library('smartticket-lib') _
+
+pipeline {
+    agent {
+        label 'agent'
+    }
+
+    environment {
+        FRONTEND_IMAGE = "myapp32/smartticket-frontend"
+        BACKEND_IMAGE  = "myapp32/smartticket-backend"
+        DOCKER_CREDS   = "dockerhub-creds"
+    }
+
+    stages {
+
+        stage('Checkout Code') {
+            steps {
+                git branch: 'main',
+                    url: 'https://github.com/myapp32/Smart-ticket-system.git'
+            }
+        }
+
+        stage('Build & Push Frontend') {
+            steps {
+                dockerBuildPush(
+                    image: FRONTEND_IMAGE,
+                    dir: 'FRONTEND',
+                    creds: DOCKER_CREDS
+                )
+            }
+        }
+
+        stage('Build & Push Backend') {
+            steps {
+                dockerBuildPush(
+                    image: BACKEND_IMAGE,
+                    dir: 'BACKEND',
+                    creds: DOCKER_CREDS
+                )
+            }
+        }
+
+        stage('Deploy Application') {
+            steps {
+                deployCompose()
+            }
+        }
+    }
+
+    post {
+        success {
+            echo "✅ CI/CD Pipeline executed successfully"
+        }
+        failure {
+            echo "❌ Pipeline failed — check logs"
+        }
+    }
+}
+
