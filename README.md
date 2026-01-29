@@ -1,6 +1,6 @@
-# 🧠 Smart Ticketing AI Agent System  
+# 🧠 Smart Ticketing  Agent System  
 
-An intelligent AI-powered ticketing system built with **Node.js**, **Express.js**, **Inngest**, **Nodemailer**, and **Google AI** APIs.  
+An intelligent  ticketing system built with **Node.js**, **Express.js**, **Inngest**, **Nodemailer**, and **Google AI** APIs.  
 This system automatically assigns tickets, suggests helpful notes, matches skills, and updates ticket status.  
 
 ---
@@ -147,10 +147,7 @@ Raise a Pull Request
 ```
 ---
 ### 👨‍💻 Author
-- Rajveer Sharma
-
-- [GitHub](https://github.com/rajveer-09)
-- [LinkedIn](https://www.linkedin.com/in/rajveer-sharma933/)
+Manik Malik
 
 ---
 
@@ -195,3 +192,4 @@ Raise a Pull Request
                                                      └───────────────────┘
 
 ```
+
